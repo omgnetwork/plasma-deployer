@@ -54,8 +54,8 @@ RUN apk add --update \
   && rm -rf /var/cache/apk/*
 
 #last bits to get things going, npm install from contracts
-RUN npm -v
-RUN ls
 RUN npm install
+# curl for healthchecks
+RUN apk add --no-cache curl
 
 CMD [ "./plasma_deployer" ]

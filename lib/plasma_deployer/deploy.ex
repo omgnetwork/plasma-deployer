@@ -1,4 +1,5 @@
 defmodule PlasmaDeployer.Deploy do
+  require Logger
   @passphrase "ThisIsATestnetPassphrase"
   @one_hundred_eth trunc(:math.pow(10, 18) * 100)
   @about_4_blocks_time 60_000
@@ -22,7 +23,8 @@ defmodule PlasmaDeployer.Deploy do
       IO.puts(file, "MIN_EXIT_PERIOD=600")
     end)
 
-    {result_text, 0} = System.cmd("npx", ["truffle", "migrate", "--network", "local", "--reset"])
+    result_text = do_deploy(3)
+
     [_, contract_addr] = String.split(result_text, ["contract_addr"], trim: true)
     [contract_addr, _, _] = String.split(contract_addr, ["\":\""], trim: true)
     [contract_addr, _, _] = String.split(contract_addr, ["\""], trim: true)
@@ -37,6 +39,16 @@ defmodule PlasmaDeployer.Deploy do
 
     values = %{contract_addr: contract_addr, txhash_contract: txhash_contract, authority_addr: authority_addr}
     Agent.start_link(fn -> values end, name: __MODULE__)
+  end
+
+  defp do_deploy(0), do: {:error, :deploy}
+  defp do_deploy(index) do
+    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", "local", "--reset"])
+    :ok = Enum.each(String.split(result_text, "\n"), &Logger.info(&1))
+    case result do
+      {_, 0} -> result_text
+      _ -> do_deploy(index - 1)
+    end
   end
 
   def create_and_fund_authority_addr(opts) do

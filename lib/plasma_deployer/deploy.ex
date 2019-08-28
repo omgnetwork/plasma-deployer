@@ -20,7 +20,8 @@ defmodule PlasmaDeployer.Deploy do
       IO.puts(file, "ETH_CLIENT_HOST=#{host}")
       port = System.get_env("ETH_CLIENT_PORT") || 8545
       IO.puts(file, "ETH_CLIENT_PORT=#{port}")
-      IO.puts(file, "MIN_EXIT_PERIOD=600")
+      exit_period_seconds = System.get_env("EXIT_PERIOD_SECONDS") || 600
+      IO.puts(file, "MIN_EXIT_PERIOD=#{exit_period_seconds}")
     end)
 
     result_text = do_deploy(3)

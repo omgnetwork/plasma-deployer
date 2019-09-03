@@ -24,7 +24,7 @@ defmodule PlasmaDeployer.Deploy do
       IO.puts(file, "MIN_EXIT_PERIOD=#{exit_period_seconds}")
     end)
 
-    result_text = do_deploy(3)
+    result_text = do_deploy(5)
 
     [_, contract_addr] = String.split(result_text, ["contract_addr"], trim: true)
     [contract_addr, _, _] = String.split(contract_addr, ["\":\""], trim: true)

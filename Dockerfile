@@ -33,7 +33,9 @@ RUN set -xe \
 #lets add plasma contract to the dir
 RUN apk add --no-cache git
 RUN git clone https://github.com/omisego/plasma-contracts .
-RUN git checkout f1493aec965bf3072920bc8cf1b281782c148560
+RUN git checkout integration_949_elixir_omg_pr
+#RUN git checkout 67b90e5175cd1e4d503ad0160cb069565ef91136
+RUN ls
 
 COPY mix.* ./
 COPY . .
@@ -54,8 +56,9 @@ RUN apk add --update \
   && rm -rf /var/cache/apk/*
 
 #last bits to get things going, npm install from contracts
-RUN npm install
+RUN cd plasma_framework && npm install
 # curl for healthchecks
 RUN apk add --no-cache curl
+RUN cd ../
 
 CMD [ "./plasma_deployer" ]

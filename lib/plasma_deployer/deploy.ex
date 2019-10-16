@@ -29,7 +29,7 @@ defmodule PlasmaDeployer.Deploy do
       # Infura specifics
       IO.puts(file, "DEPLOYER_PRIVATEKEY=#{System.get_env("DEPLOYER_PRIVATEKEY")}")
       IO.puts(file, "AUTHORITY_PRIVATEKEY=#{System.get_env("AUTHORITY_PRIVATEKEY")}")
-      IO.puts(file, "INFURA_URL=#{host}")
+      IO.puts(file, "INFURA_URL=#{System.get_env("INFURA_URL")}")
       IO.puts(file, "INFURA_API_KEY=#{System.get_env("INFURA_API_KEY")}")
     end)
 

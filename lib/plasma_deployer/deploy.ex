@@ -32,9 +32,8 @@ defmodule PlasmaDeployer.Deploy do
       IO.puts(file, "INFURA_URL=#{host}")
       IO.puts(file, "INFURA_API_KEY=#{System.get_env("INFURA_API_KEY")}")
     end)
-    file = File.read!(".env")
-    IO.inspect file
-    result_text = do_deploy(5)
+
+    result_text = do_deploy(5, opts)
 
     [_, plasma_framework_tx_hash] = String.split(result_text, ["plasma_framework_tx_hash"], trim: true)
     plasma_framework_tx_hash = hd(String.split(plasma_framework_tx_hash, ["\":\""], trim: true))
@@ -66,9 +65,7 @@ defmodule PlasmaDeployer.Deploy do
     Agent.start_link(fn -> values end, name: __MODULE__)
   end
 
-  defp prepare(opts) do
-    opts |> Keyword.fetch!(:client_type) |> prepare(opts)
-  end
+  defp prepare(opts), do: prepare(opts[:client_type], opts)
 
   defp prepare(:geth, opts) do
     {:ok, authority_addr} = create_and_fund_authority_addr(opts)
@@ -95,16 +92,19 @@ defmodule PlasmaDeployer.Deploy do
   defp parse_client_type(""), do: parse_client_type(nil)
   defp parse_client_type(_), do: raise("Unrecognized client type provided.")
 
-  defp do_deploy(0), do: {:error, :deploy}
-  defp do_deploy(index) do
-    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", "local", "--reset"], cd: "plasma_framework")
-    #:io.fwrite("~p",[result])
-    :ok = Enum.each(String.split(result_text, "\n"), &Logger.warn(&1))
+  defp do_deploy(0, _opts), do: {:error, :deploy}
+  defp do_deploy(index, opts) do
+    network = truffle_network_by_client(opts[:client_type])
+    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", network, "--reset"])
+    :ok = Enum.each(String.split(result_text, "\n"), &Logger.info(&1))
     case result do
       {_, 0} -> result_text
-      _ -> do_deploy(index - 1)
+      _ -> do_deploy(index - 1, opts)
     end
   end
+
+  defp truffle_network_by_client(:infura), do: "infura"
+  defp truffle_network_by_client(_), do: "local"
 
   def create_and_fund_authority_addr(opts) do
     with {:ok, authority} <-

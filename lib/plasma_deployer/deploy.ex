@@ -23,29 +23,45 @@ defmodule PlasmaDeployer.Deploy do
       exit_period_seconds = System.get_env("EXIT_PERIOD_SECONDS") || 600
       IO.puts(file, "MIN_EXIT_PERIOD=#{exit_period_seconds}")
     end)
-
+    file = File.read!(".env")
+    IO.inspect file
     result_text = do_deploy(5)
 
-    [_, contract_addr] = String.split(result_text, ["contract_addr"], trim: true)
-    [contract_addr, _, _] = String.split(contract_addr, ["\":\""], trim: true)
-    [contract_addr, _, _] = String.split(contract_addr, ["\""], trim: true)
+    [_, plasma_framework_tx_hash] = String.split(result_text, ["plasma_framework_tx_hash"], trim: true)
+    plasma_framework_tx_hash = hd(String.split(plasma_framework_tx_hash, ["\":\""], trim: true))
+    [plasma_framework_tx_hash, _, _] = String.split(plasma_framework_tx_hash, ["\""], trim: true)
 
-    [_, txhash_contract] = String.split(result_text, ["txhash_contract"], trim: true)
-    [txhash_contract, _] = String.split(txhash_contract, ["\":\""], trim: true)
-    [txhash_contract, _, _] = String.split(txhash_contract, ["\""], trim: true)
+    #middle four parse the same way, first and last occurance is different
+    [_, plasma_framework] = String.split(result_text, ["\"plasma_framework\""], trim: true)
+    plasma_framework = hd(String.split(plasma_framework, ["\":\""], trim: true))
+    plasma_framework = Enum.at(String.split(plasma_framework, ["\""], trim: true), 1)
 
-    [_, _, authority_addr] = String.split(result_text, ["authority_addr"], trim: true)
-    [authority_addr] = String.split(authority_addr, ["\":\""], trim: true)
-    [authority_addr, _] = String.split(authority_addr, ["\""], trim: true)
+    [_, eth_vault] = String.split(result_text, ["\"eth_vault\""], trim: true)
+    eth_vault = hd(String.split(eth_vault, ["\":\""], trim: true))
+    eth_vault = Enum.at(String.split(eth_vault, ["\""], trim: true), 1)
 
-    values = %{contract_addr: contract_addr, txhash_contract: txhash_contract, authority_addr: authority_addr}
+    [_, erc20_vault] = String.split(result_text, ["\"erc20_vault\""], trim: true)
+    erc20_vault = hd(String.split(erc20_vault, ["\":\""], trim: true))
+    erc20_vault = Enum.at(String.split(erc20_vault, ["\""], trim: true), 1)
+
+    [_, payment_exit_game] = String.split(result_text, ["\"payment_exit_game\""], trim: true)
+    payment_exit_game = hd(String.split(payment_exit_game, ["\":\""], trim: true))
+    payment_exit_game = Enum.at(String.split(payment_exit_game, ["\""], trim: true), 1)
+
+    [_, authority_address] = String.split(result_text, ["\"payment_exit_game\""], trim: true)
+    authority_address = tl(String.split(authority_address, ["\":\""], trim: true))
+    [authority_address, _] = String.split(Enum.at(authority_address, 0), ["\""], trim: true)
+
+    values = %{plasma_framework_tx_hash: plasma_framework_tx_hash, plasma_framework: plasma_framework, eth_vault: eth_vault,
+    erc20_vault: erc20_vault, payment_exit_game: payment_exit_game, authority_address: authority_address}
     Agent.start_link(fn -> values end, name: __MODULE__)
   end
 
   defp do_deploy(0), do: {:error, :deploy}
   defp do_deploy(index) do
-    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", "local", "--reset"])
-    :ok = Enum.each(String.split(result_text, "\n"), &Logger.info(&1))
+    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", "local", "--reset"], cd: "plasma_framework")
+    #:io.fwrite("~p",[result])
+    :ok = Enum.each(String.split(result_text, "\n"), &Logger.warn(&1))
     case result do
       {_, 0} -> result_text
       _ -> do_deploy(index - 1)

@@ -1,0 +1,7 @@
+Useful commands:
+docker-compose up
+
+To build:
+docker build -t plasma-deployer .
+docker tag <image id> omisego/plasma-deployer:<tag>
+docker push omisego/plasma-deployer:<tag>

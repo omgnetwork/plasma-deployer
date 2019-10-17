@@ -48,12 +48,12 @@ defmodule PlasmaDeployer.Deploy do
     payment_exit_game = hd(String.split(payment_exit_game, ["\":\""], trim: true))
     payment_exit_game = Enum.at(String.split(payment_exit_game, ["\""], trim: true), 1)
 
-    [_, authority_address] = String.split(result_text, ["\"payment_exit_game\""], trim: true)
-    authority_address = tl(String.split(authority_address, ["\":\""], trim: true))
-    [authority_address, _] = String.split(Enum.at(authority_address, 0), ["\""], trim: true)
+    # [_, authority_address] = String.split(result_text, ["\"payment_exit_game\""], trim: true)
+    # authority_address = tl(String.split(authority_address, ["\":\""], trim: true))
+    # [authority_address, _] = String.split(Enum.at(authority_address, 0), ["\""], trim: true)
 
     values = %{plasma_framework_tx_hash: plasma_framework_tx_hash, plasma_framework: plasma_framework, eth_vault: eth_vault,
-    erc20_vault: erc20_vault, payment_exit_game: payment_exit_game, authority_address: authority_address}
+    erc20_vault: erc20_vault, payment_exit_game: payment_exit_game, authority_address: authority}
     Agent.start_link(fn -> values end, name: __MODULE__)
   end
 

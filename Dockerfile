@@ -33,8 +33,7 @@ RUN set -xe \
 #lets add plasma contract to the dir
 RUN apk add --no-cache git
 RUN git clone https://github.com/omisego/plasma-contracts .
-RUN git checkout integration_949_elixir_omg_pr
-#RUN git checkout 67b90e5175cd1e4d503ad0160cb069565ef91136
+RUN git checkout 7b8a2643568556c1d126749724666bc37edc8141
 RUN ls
 
 COPY mix.* ./

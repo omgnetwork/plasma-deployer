@@ -26,14 +26,12 @@ defmodule PlasmaDeployer.Deploy do
       exit_period_seconds = System.get_env("EXIT_PERIOD_SECONDS") || 600
       IO.puts(file, "MIN_EXIT_PERIOD=#{exit_period_seconds}")
 
-      # Infura specifics
-      IO.puts(file, "DEPLOYER_PRIVATEKEY=#{System.get_env("DEPLOYER_PRIVATEKEY")}")
-      IO.puts(file, "AUTHORITY_PRIVATEKEY=#{System.get_env("AUTHORITY_PRIVATEKEY")}")
-      IO.puts(file, "INFURA_URL=#{System.get_env("INFURA_URL")}")
-      IO.puts(file, "INFURA_API_KEY=#{System.get_env("INFURA_API_KEY")}")
+      Enum.each(extra_envs(opts), fn {key, value} ->
+        IO.puts(file, "#{key}=#{value}")
+      end)
     end)
 
-    result_text = do_deploy(5, opts)
+    result_text = do_deploy(1, opts)
 
     [_, plasma_framework_tx_hash] = String.split(result_text, ["plasma_framework_tx_hash"], trim: true)
     plasma_framework_tx_hash = hd(String.split(plasma_framework_tx_hash, ["\":\""], trim: true))
@@ -65,6 +63,13 @@ defmodule PlasmaDeployer.Deploy do
     Agent.start_link(fn -> values end, name: __MODULE__)
   end
 
+  defp parse_client_type(nil), do: :geth
+  defp parse_client_type("geth"), do: :geth
+  defp parse_client_type("parity"), do: :parity
+  defp parse_client_type("infura"), do: :infura
+  defp parse_client_type(""), do: parse_client_type(nil)
+  defp parse_client_type(_), do: exit("Unrecognized client type provided.")
+
   defp prepare(opts), do: prepare(opts[:client_type], opts)
 
   defp prepare(:geth, opts) do
@@ -80,17 +85,27 @@ defmodule PlasmaDeployer.Deploy do
   end
 
   defp prepare(:infura, _opts) do
-    authority_addr = System.get_env("DEPLOYER_ADDRESS") || raise("DEPLOYER_ADDRESS is required for infura deployment.")
-    deployer_addr = System.get_env("AUTHORITY_ADDRESS") || raise("AUTHORITY_ADDRESS is required for infura deployment.")
+    authority_addr = System.get_env("AUTHORITY_ADDRESS") || exit("AUTHORITY_ADDRESS is required for infura deployment.")
+    deployer_addr = System.get_env("DEPLOYER_ADDRESS") || exit("DEPLOYER_ADDRESS is required for infura deployment.")
     {:ok, authority_addr, deployer_addr}
   end
 
-  defp parse_client_type(nil), do: :geth
-  defp parse_client_type("geth"), do: :geth
-  defp parse_client_type("parity"), do: :parity
-  defp parse_client_type("infura"), do: :infura
-  defp parse_client_type(""), do: parse_client_type(nil)
-  defp parse_client_type(_), do: raise("Unrecognized client type provided.")
+  defp extra_envs(opts), do: extra_envs(opts[:client_type], opts)
+
+  defp extra_envs(:infura, _opts) do
+    [
+      {"INFURA_URL", System.get_env("INFURA_URL") || exit("INFURA_URL is required for infura deployment.")},
+      {"INFURA_API_KEY", System.get_env("INFURA_API_KEY") || exit("INFURA_API_KEY is required for infura deployment.")},
+      {"DEPLOYER_PRIVATEKEY", System.get_env("DEPLOYER_PRIVATEKEY") || exit("DEPLOYER_PRIVATEKEY is required for infura deployment.")},
+      {"MAINTAINER_PRIVATEKEY", System.get_env("MAINTAINER_PRIVATEKEY") || exit("MAINTAINER_PRIVATEKEY is required for infura deployment.")},
+      {"AUTHORITY_PRIVATEKEY", System.get_env("AUTHORITY_PRIVATEKEY") || exit("AUTHORITY_PRIVATEKEY is required for infura deployment.")},
+      {"USE_EXISTING_AUTHORITY_ADDRESS", "true"}
+    ]
+  end
+
+  defp extra_envs(:geth, _), do: []
+  defp extra_envs(:parity, _), do: []
+  defp extra_envs(_, _), do: []
 
   defp do_deploy(0, _opts), do: {:error, :deploy}
   defp do_deploy(index, opts) do

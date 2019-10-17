@@ -68,7 +68,7 @@ defmodule PlasmaDeployer.Deploy do
   defp parse_client_type("parity"), do: :parity
   defp parse_client_type("infura"), do: :infura
   defp parse_client_type(""), do: parse_client_type(nil)
-  defp parse_client_type(_), do: exit("Unrecognized client type provided.")
+  defp parse_client_type(_), do: exit("Unrecognized client type provided. Supports geth, parity and infura.")
 
   defp prepare(opts), do: prepare(opts[:client_type], opts)
 

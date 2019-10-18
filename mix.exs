@@ -21,7 +21,8 @@ defmodule PlasmaDeployer.Mixfile do
     [
       {:plug, "~> 1.0"},
       {:plug_cowboy, "~> 2.0"},
-      {:ethereumex, "~> 0.5.4"}
+      {:ethereumex, "~> 0.5.4"},
+      {:jason, "~> 1.1"}
     ]
   end
 

@@ -33,7 +33,7 @@ defmodule PlasmaDeployer.Deploy do
 
     file = File.read!(".env")
     IO.inspect file
-    do_deploy(1, opts)
+    do_deploy(5, opts)
 
     data = File.read!("plasma_framework/build/outputs.json")
     IO.inspect data

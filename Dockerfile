@@ -33,7 +33,7 @@ RUN set -xe \
 #lets add plasma contract to the dir
 RUN apk add --no-cache git
 RUN git clone https://github.com/omisego/plasma-contracts .
-RUN git checkout fb7109a9e823b998c20484deac8609cda425218a
+RUN git checkout b24ae4080d564e38fa85924120c7ac2d78057a3c
 RUN ls
 
 COPY mix.* ./

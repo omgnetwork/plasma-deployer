@@ -31,35 +31,15 @@ defmodule PlasmaDeployer.Deploy do
       end)
     end)
 
-    result_text = do_deploy(1, opts)
+    file = File.read!(".env")
+    IO.inspect file
+    do_deploy(1, opts)
 
-    [_, plasma_framework_tx_hash] = String.split(result_text, ["plasma_framework_tx_hash"], trim: true)
-    plasma_framework_tx_hash = hd(String.split(plasma_framework_tx_hash, ["\":\""], trim: true))
-    [plasma_framework_tx_hash, _, _] = String.split(plasma_framework_tx_hash, ["\""], trim: true)
+    data = File.read!("plasma_framework/build/outputs.json")
+    IO.inspect data
+    %{plasma_framework_tx_hash: _plasma_framework_tx_hash, plasma_framework: _plasma_framework, eth_vault: _eth_vault,
+    erc20_vault: _erc20_vault, payment_exit_game: _payment_exit_game, authority_address: _authority} = values = Jason.decode!(data, keys: :atoms)
 
-    #middle four parse the same way, first and last occurance is different
-    [_, plasma_framework] = String.split(result_text, ["\"plasma_framework\""], trim: true)
-    plasma_framework = hd(String.split(plasma_framework, ["\":\""], trim: true))
-    plasma_framework = Enum.at(String.split(plasma_framework, ["\""], trim: true), 1)
-
-    [_, eth_vault] = String.split(result_text, ["\"eth_vault\""], trim: true)
-    eth_vault = hd(String.split(eth_vault, ["\":\""], trim: true))
-    eth_vault = Enum.at(String.split(eth_vault, ["\""], trim: true), 1)
-
-    [_, erc20_vault] = String.split(result_text, ["\"erc20_vault\""], trim: true)
-    erc20_vault = hd(String.split(erc20_vault, ["\":\""], trim: true))
-    erc20_vault = Enum.at(String.split(erc20_vault, ["\""], trim: true), 1)
-
-    [_, payment_exit_game] = String.split(result_text, ["\"payment_exit_game\""], trim: true)
-    payment_exit_game = hd(String.split(payment_exit_game, ["\":\""], trim: true))
-    payment_exit_game = Enum.at(String.split(payment_exit_game, ["\""], trim: true), 1)
-
-    [_, authority_address] = String.split(result_text, ["\"payment_exit_game\""], trim: true)
-    authority_address = tl(String.split(authority_address, ["\":\""], trim: true))
-    [authority_address, _] = String.split(Enum.at(authority_address, 0), ["\""], trim: true)
-
-    values = %{plasma_framework_tx_hash: plasma_framework_tx_hash, plasma_framework: plasma_framework, eth_vault: eth_vault,
-    erc20_vault: erc20_vault, payment_exit_game: payment_exit_game, authority_address: authority_address}
     Agent.start_link(fn -> values end, name: __MODULE__)
   end
 
@@ -110,8 +90,8 @@ defmodule PlasmaDeployer.Deploy do
   defp do_deploy(0, _opts), do: {:error, :deploy}
   defp do_deploy(index, opts) do
     network = truffle_network_by_client(opts[:client_type])
-    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", network, "--reset"])
-    :ok = Enum.each(String.split(result_text, "\n"), &Logger.info(&1))
+    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", network, "--reset"], cd: "plasma_framework")
+    :ok = Enum.each(String.split(result_text, "\n"), &Logger.warn(&1))
     case result do
       {_, 0} -> result_text
       _ -> do_deploy(index - 1, opts)

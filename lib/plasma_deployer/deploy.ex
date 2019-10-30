@@ -5,16 +5,19 @@ defmodule PlasmaDeployer.Deploy do
   @about_4_blocks_time 60_000
 
   def do_it do
-    opts = []
-    {:ok, authority} = create_and_fund_authority_addr(opts)
-    {:ok, deployer_addr} = get_deployer_address(opts)
-    IO.puts(authority)
+    opts = [
+      client_type: parse_client_type(System.get_env("CLIENT_TYPE"))
+    ]
+
+    {:ok, authority_addr, deployer_addr} = prepare(opts)
+
+    IO.puts(authority_addr)
     IO.puts(deployer_addr)
 
     File.open!(".env", [:write], fn file ->
       IO.puts(file, "DEPLOYER_ADDRESS=#{deployer_addr}")
       IO.puts(file, "DEPLOYER_PASSPHRASE=\"\"")
-      IO.puts(file, "AUTHORITY_ADDRESS=#{authority}")
+      IO.puts(file, "AUTHORITY_ADDRESS=#{authority_addr}")
       IO.puts(file, "AUTHORITY_PASSPHRASE=#{@passphrase}")
       host = System.get_env("ETH_CLIENT_HOST") || "localhost"
       IO.puts(file, "ETH_CLIENT_HOST=#{host}")
@@ -22,10 +25,15 @@ defmodule PlasmaDeployer.Deploy do
       IO.puts(file, "ETH_CLIENT_PORT=#{port}")
       exit_period_seconds = System.get_env("EXIT_PERIOD_SECONDS") || 600
       IO.puts(file, "MIN_EXIT_PERIOD=#{exit_period_seconds}")
+
+      Enum.each(extra_envs(opts), fn {key, value} ->
+        IO.puts(file, "#{key}=#{value}")
+      end)
     end)
+
     file = File.read!(".env")
     IO.inspect file
-    do_deploy(5)
+    do_deploy(5, opts)
 
     data = File.read!("plasma_framework/build/outputs.json")
     IO.inspect data
@@ -35,15 +43,63 @@ defmodule PlasmaDeployer.Deploy do
     Agent.start_link(fn -> values end, name: __MODULE__)
   end
 
-  defp do_deploy(0), do: {:error, :deploy}
-  defp do_deploy(index) do
-    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", "local", "--reset"], cd: "plasma_framework")
+  defp parse_client_type(nil), do: :geth
+  defp parse_client_type("geth"), do: :geth
+  defp parse_client_type("parity"), do: :parity
+  defp parse_client_type("infura"), do: :infura
+  defp parse_client_type(""), do: parse_client_type(nil)
+  defp parse_client_type(_), do: exit("Unrecognized client type provided. Supports geth, parity and infura.")
+
+  defp prepare(opts), do: prepare(opts[:client_type], opts)
+
+  defp prepare(:geth, opts) do
+    {:ok, authority_addr} = create_and_fund_authority_addr(opts)
+    {:ok, deployer_addr} = get_deployer_address(opts)
+    {:ok, authority_addr, deployer_addr}
+  end
+
+  defp prepare(:parity, opts) do
+    {:ok, authority_addr} = create_and_fund_authority_addr(opts)
+    {:ok, deployer_addr} = get_deployer_address(opts)
+    {:ok, authority_addr, deployer_addr}
+  end
+
+  defp prepare(:infura, _opts) do
+    authority_addr = System.get_env("AUTHORITY_ADDRESS") || exit("AUTHORITY_ADDRESS is required for infura deployment.")
+    deployer_addr = System.get_env("DEPLOYER_ADDRESS") || exit("DEPLOYER_ADDRESS is required for infura deployment.")
+    {:ok, authority_addr, deployer_addr}
+  end
+
+  defp extra_envs(opts), do: extra_envs(opts[:client_type], opts)
+
+  defp extra_envs(:infura, _opts) do
+    [
+      {"INFURA_URL", System.get_env("INFURA_URL") || exit("INFURA_URL is required for infura deployment.")},
+      {"INFURA_API_KEY", System.get_env("INFURA_API_KEY") || exit("INFURA_API_KEY is required for infura deployment.")},
+      {"DEPLOYER_PRIVATEKEY", System.get_env("DEPLOYER_PRIVATEKEY") || exit("DEPLOYER_PRIVATEKEY is required for infura deployment.")},
+      {"MAINTAINER_PRIVATEKEY", System.get_env("MAINTAINER_PRIVATEKEY") || exit("MAINTAINER_PRIVATEKEY is required for infura deployment.")},
+      {"AUTHORITY_PRIVATEKEY", System.get_env("AUTHORITY_PRIVATEKEY") || exit("AUTHORITY_PRIVATEKEY is required for infura deployment.")},
+      {"USE_EXISTING_AUTHORITY_ADDRESS", "true"}
+    ]
+  end
+
+  defp extra_envs(:geth, _), do: []
+  defp extra_envs(:parity, _), do: []
+  defp extra_envs(_, _), do: []
+
+  defp do_deploy(0, _opts), do: {:error, :deploy}
+  defp do_deploy(index, opts) do
+    network = truffle_network_by_client(opts[:client_type])
+    {result_text, _} = result = System.cmd("npx", ["truffle", "migrate", "--network", network, "--reset"], cd: "plasma_framework")
     :ok = Enum.each(String.split(result_text, "\n"), &Logger.warn(&1))
     case result do
       {_, 0} -> result_text
-      _ -> do_deploy(index - 1)
+      _ -> do_deploy(index - 1, opts)
     end
   end
+
+  defp truffle_network_by_client(:infura), do: "infura"
+  defp truffle_network_by_client(_), do: "local"
 
   def create_and_fund_authority_addr(opts) do
     with {:ok, authority} <-
@@ -67,7 +123,7 @@ defmodule PlasmaDeployer.Deploy do
       |> Keyword.merge(opts)
       |> Enum.into(%{})
 
-    unlock_if_possible(account_enc)
+    unlock_if_possible(account_enc, opts[:client_type])
 
     params = %{from: faucet, to: account_enc, value: to_hex(initial_funds)}
     {:ok, tx_fund} = send_transaction(params)
@@ -116,10 +172,6 @@ defmodule PlasmaDeployer.Deploy do
 
   def from_hex("0x" <> encoded), do: Base.decode16!(encoded, case: :lower)
 
-  defp unlock_if_possible(account_enc) do
-    unlock_if_possible(account_enc, :geth)
-  end
-
   defp unlock_if_possible(account_enc, :geth) do
     {:ok, true} =
       Ethereumex.HttpClient.request("personal_unlockAccount", [account_enc, @passphrase, 0], url: get_host_from_env())
@@ -127,6 +179,10 @@ defmodule PlasmaDeployer.Deploy do
 
   defp unlock_if_possible(_account_enc, :parity) do
     :dont_bother_will_use_personal_sendTransaction
+  end
+
+  defp unlock_if_possible(_account_enc, :infura) do
+    :dont_bother_will_use_sendRawTransaction
   end
 
   defp get_host_from_env() do
